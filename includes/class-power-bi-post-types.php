@@ -35,25 +35,10 @@ class Power_Bi_Post_Types {
 	 */
 	private function setup_actions() {
 		add_action( 'init', array( $this, 'register_post_types' ) );
-		add_action( 'cmb2_init', array( $this, 'power_bi_metaboxes' ) );
+		add_action( 'cmb2_init', array( $this, 'power_bi_metaboxs' ) );
 		add_filter( 'manage_powerbi_posts_columns', array( $this, 'set_custom_edit_powerbi_columns' ) );
 		add_action( 'manage_powerbi_posts_custom_column', array( $this, 'custom_powerbi_column' ), 10, 2 );
-        add_filter( 'single_template', [$this, 'power_bi_single_template']);
 	}
-
-    /**
-	 * load "power_bi" single post template.
-	 */
-    public function power_bi_single_template($single){
-        global $post;
-        /* Checks for single template by post type */
-        if ( $post->post_type == 'powerbi' ) {
-            if ( file_exists( plugin_dir_path( __DIR__ ) . 'templates/single-power_bi.php' ) ) {
-                return plugin_dir_path( __DIR__ ) . 'templates/single-power_bi.php';
-            }
-        }
-        return $single;
-    }
 
 	/**
 	 * Register a custom post type called "power_bi".
@@ -107,22 +92,12 @@ class Power_Bi_Post_Types {
 		);
 
 		register_post_type( 'powerbi', $args );
-
-        //flush rewrite rules the first time post type is registered
-        $rewrite_rules_flushed = get_option('_powerbi_embed_flushed', false);
-        if(!$rewrite_rules_flushed || $rewrite_rules_flushed !== 'flushed'){
-            //clear transient this first time to ensure we are not off on our transient timer refresh
-            delete_transient('t_token');
-            //make sure post types load correctly            
-            flush_rewrite_rules();
-            update_option('_powerbi_embed_flushed', 'flushed');
-        }
 	}
 
 	/**
 	 * Register metabox
 	 */
-	public function power_bi_metaboxes() {
+	public function power_bi_metaboxs() {
 		// Start with an underscore to hide fields from custom fields list.
 		$prefix = '_power_bi_';
 		$languages = $this->get_languages();
@@ -266,6 +241,18 @@ class Power_Bi_Post_Types {
 		) );
 
 		$metabox_details->add_field( array(
+			'name'    => 'Filter',
+			'desc'    => 'Enter a filter object. Refer to the Power BI JavaScript Wiki for more information about filters.',
+			'id'      => $prefix . 'filter',
+			'type'    => 'textarea',
+			'default' => '',
+			'attributes' => array(
+				'data-conditional-id'    => $prefix . 'embed_type',
+				'data-conditional-value' => wp_json_encode( array( 'report' ) ),
+			),
+		) );
+
+		$metabox_details->add_field( array(
 			'name'    => 'Visual Name',
 			'desc'    => 'The Visual Name can be retrieved using the GetVisuals method on the Page object.',
 			'id'      => $prefix . 'visual_name',
@@ -332,22 +319,6 @@ class Power_Bi_Post_Types {
 			'desc'    => 'Enter height in pixels or percent (include %).',
 			'id'      => $prefix . 'height',
 			'default' => '350px',
-			'type'    => 'text',
-		) );
-
-        $metabox_settings->add_field( array(
-			'name'    => 'Mobile Width',
-			'desc'    => 'Enter mobile width in pixels or percent (include %).',
-			'id'      => $prefix . 'mobile_width',
-			'default' => '100%',
-			'type'    => 'text',
-		) );
-
-		$metabox_settings->add_field( array(
-			'name'    => 'Mobile Height',
-			'desc'    => 'Enter mobile height in pixels, percent (include %) or type auto.',
-			'id'      => $prefix . 'mobile_height',
-			'default' => '500px',
 			'type'    => 'text',
 		) );
 	}
