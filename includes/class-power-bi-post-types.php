@@ -245,7 +245,15 @@ class Power_Bi_Post_Types {
 			'desc'    => 'Enter a filter object. Refer to the Power BI JavaScript Wiki for more information about filters.',
 			'id'      => $prefix . 'filter',
 			'type'    => 'textarea',
-			'default' => '',
+			'default' => wp_json_encode(array(
+				'$schema' => 'http://powerbi.com/product/schema#basic',
+				'target' => array(
+					'table' => 'TABLE_NAME', 
+					'column' => 'COLUMN_NAME', 
+				),
+				'operator' => 'In',
+				'values' => array('VALUE','OPTIONAL_VALUE','OPTIONAL_VALUE')
+			), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
 			'attributes' => array(
 				'required' => 'required',
 				'data-conditional-id'    => $prefix . 'embed_type',
