@@ -247,6 +247,7 @@ class Power_Bi_Post_Types {
 			'type'    => 'textarea',
 			'default' => '',
 			'attributes' => array(
+				'required' => 'required',
 				'data-conditional-id'    => $prefix . 'embed_type',
 				'data-conditional-value' => wp_json_encode( array( 'report' ) ),
 			),
