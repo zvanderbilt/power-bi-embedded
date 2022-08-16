@@ -1,15 +1,21 @@
-/**
+/**!
+ * url-search-params-polyfill
  *
- *
- * @author Jerry Bendy <jerry@icewingcc.com>
+ * @author Jerry Bendy (https://github.com/jerrybendy)
  * @licence MIT
- *
  */
-
 (function(self) {
     'use strict';
 
-    var nativeURLSearchParams = self.URLSearchParams ? self.URLSearchParams : null,
+    var nativeURLSearchParams = (function() {
+            // #41 Fix issue in RN
+            try {
+                if (self.URLSearchParams && (new self.URLSearchParams('foo=bar')).get('foo') === 'bar') {
+                    return self.URLSearchParams;
+                }
+            } catch (e) {}
+            return null;
+        })(),
         isSupportObjectConstructor = nativeURLSearchParams && (new nativeURLSearchParams({a: 1})).toString() === 'a=1',
         // There is a bug in safari 10.1 (and earlier) that incorrectly decodes `%2B` as an empty space and not a plus.
         decodesPlusesCorrectly = nativeURLSearchParams && (new nativeURLSearchParams('s=%2B').get('s') === '+'),
@@ -61,7 +67,7 @@
      *
      * @param {string} name
      */
-    prototype.delete = function(name) {
+    prototype['delete'] = function(name) {
         delete this [__URLSearchParams__] [name];
     };
 
@@ -73,7 +79,7 @@
      */
     prototype.get = function(name) {
         var dict = this [__URLSearchParams__];
-        return name in dict ? dict[name][0] : null;
+        return this.has(name) ? dict[name][0] : null;
     };
 
     /**
@@ -84,7 +90,7 @@
      */
     prototype.getAll = function(name) {
         var dict = this [__URLSearchParams__];
-        return name in dict ? dict [name].slice(0) : [];
+        return this.has(name) ? dict [name].slice(0) : [];
     };
 
     /**
@@ -94,7 +100,7 @@
      * @returns {boolean}
      */
     prototype.has = function(name) {
-        return name in this [__URLSearchParams__];
+        return hasOwnProperty(this [__URLSearchParams__], name);
     };
 
     /**
@@ -127,19 +133,26 @@
 
     // There is a bug in Safari 10.1 and `Proxy`ing it is not enough.
     var forSureUsePolyfill = !decodesPlusesCorrectly;
-    var useProxy = (!forSureUsePolyfill && nativeURLSearchParams && !isSupportObjectConstructor && self.Proxy)
+    var useProxy = (!forSureUsePolyfill && nativeURLSearchParams && !isSupportObjectConstructor && self.Proxy);
+    var propValue; 
+    if (useProxy) {
+        // Safari 10.0 doesn't support Proxy, so it won't extend URLSearchParams on safari 10.0
+        propValue = new Proxy(nativeURLSearchParams, {
+            construct: function (target, args) {
+                return new target((new URLSearchParamsPolyfill(args[0]).toString()));
+            }
+        })
+        // Chrome <=60 .toString() on a function proxy got error "Function.prototype.toString is not generic"
+        propValue.toString = Function.prototype.toString.bind(URLSearchParamsPolyfill);
+    } else {
+        propValue = URLSearchParamsPolyfill;
+    }
     /*
      * Apply polifill to global object and append other prototype into it
      */
-    self.URLSearchParams = useProxy ?
-        // Safari 10.0 doesn't support Proxy, so it won't extend URLSearchParams on safari 10.0
-        new Proxy(nativeURLSearchParams, {
-            construct: function(target, args) {
-                return new target((new URLSearchParamsPolyfill(args[0]).toString()));
-            }
-        }) :
-        URLSearchParamsPolyfill;
-
+    Object.defineProperty(self, 'URLSearchParams', {
+        value: propValue
+    });
 
     var USPProto = self.URLSearchParams.prototype;
 
@@ -170,7 +183,7 @@
         keys.sort();
 
         for (i = 0; i < keys.length; i++) {
-            this.delete(keys[i]);
+            this['delete'](keys[i]);
         }
         for (i = 0; i < keys.length; i++) {
             var key = keys[i], values = dict[key];
@@ -244,7 +257,11 @@
     }
 
     function decode(str) {
-        return decodeURIComponent(str.replace(/\+/g, ' '));
+        return str
+            .replace(/[ +]/g, '%20')
+            .replace(/(%[a-f0-9]{2})+/ig, function(match) {
+                return decodeURIComponent(match);
+            });
     }
 
     function makeIterator(arr) {
@@ -268,9 +285,22 @@
         var dict = {};
 
         if (typeof search === "object") {
-            for (var key in search) {
-                if (search.hasOwnProperty(key)) {
-                    appendTo(dict, key, search[key])
+            // if `search` is an array, treat it as a sequence
+            if (isArray(search)) {
+                for (var i = 0; i < search.length; i++) {
+                    var item = search[i];
+                    if (isArray(item) && item.length === 2) {
+                        appendTo(dict, item[0], item[1]);
+                    } else {
+                        throw new TypeError("Failed to construct 'URLSearchParams': Sequence initializer must only contain pair elements");
+                    }
+                }
+
+            } else {
+                for (var key in search) {
+                    if (search.hasOwnProperty(key)) {
+                        appendTo(dict, key, search[key]);
+                    }
                 }
             }
 
@@ -302,13 +332,22 @@
     function appendTo(dict, name, value) {
         var val = typeof value === 'string' ? value : (
             value !== null && value !== undefined && typeof value.toString === 'function' ? value.toString() : JSON.stringify(value)
-        )
+        );
 
-        if (name in dict) {
+        // #47 Prevent using `hasOwnProperty` as a property name
+        if (hasOwnProperty(dict, name)) {
             dict[name].push(val);
         } else {
             dict[name] = [val];
         }
+    }
+
+    function isArray(val) {
+        return !!val && '[object Array]' === Object.prototype.toString.call(val);
+    }
+
+    function hasOwnProperty(obj, prop) {
+        return Object.prototype.hasOwnProperty.call(obj, prop);
     }
 
 })(typeof global !== 'undefined' ? global : (typeof window !== 'undefined' ? window : this));
