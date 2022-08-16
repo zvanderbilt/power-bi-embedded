@@ -222,13 +222,15 @@ class Power_Bi_Shortcodes {
 					var urlParams = new URLSearchParams(window.location.search);
 
 					// if filters value exists parse the encoded string to JSON and set as filter
-					if ( urlParams.has('filters') ) {
+					if ( urlParams.has('filters')) {
 						var urlFilters = JSON.parse(urlParams.get("filters"));
 						var filters = urlFilters;
-						
-						embedConfiguration.filters = filters;
+						if (filters){	
+							embedConfiguration.filters = filters;
+						} else {
+							throw 'filters cannot be null'
+						}
 					}
-
 					// ****
 					// apply slicers before report load
 					// ****
